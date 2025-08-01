@@ -4,60 +4,68 @@ param location string = resourceGroup().location
 
 var locationShortCodes = {
   uksouth: 'uks'
-  ukwest: 'ukw'
-  northeurope: 'ne'
 }
 var locationShort = locationShortCodes[location]
-var logicAppName = 'logic-${project}-${environment}-${locationShort}-001'
 
-module logicApp 'br/public:avm/res/logic/workflow:0.5.2' = {
-  name: 'logicAppDeployment'
-  params: {
-    name: logicAppName
-    location: location
-    managedIdentities: {
-      systemAssigned: true
-    }
-    workflowTriggers: {
-      Recurrence: {
-        recurrence: {
-          frequency: 'Minute'
-          interval: 5
+resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
+  name: 'logic-${project}-${environment}-${locationShort}-001'
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    definition: json(loadTextContent('config/workflow.json'))
+    parameters: {
+      '$connections': {
+        value: {
+          'azurerm-${project}-${environment}-${locationShort}-001': {
+            connectionId: apiConnection1.id
+            connectionName: apiConnection1.name
+            id: apiConnection1.properties.api.id
+            connectionProperties: {
+              authentication: {
+                type: 'ManagedServiceIdentity'
+              }
+            }
+          }
+          'azurevm-${project}-${environment}-${locationShort}-001': {
+            connectionId: apiConnection2.id
+            connectionName: apiConnection2.name
+            id: apiConnection2.properties.api.id
+            connectionProperties: {
+              authentication: {
+                type: 'ManagedServiceIdentity'
+              }
+            }
+          }
         }
-        type: 'Recurrence'
       }
     }
   }
 }
 
-module apiConnection1 'br/public:avm/res/web/connection:0.4.2' = {
-  name: 'apiConnectionDeployment1'
-  params: {
+resource apiConnection1 'Microsoft.Web/connections@2016-06-01' = {
+  name:  'azurerm-${project}-${environment}-${locationShort}-001'
+  kind:  'V1'
+  location: location
+  properties: {
     displayName: 'azurerm'
-    name: 'azurerm-${project}-${environment}-${locationShort}-001'
     api: {
-      name: 'azurerm'
-      displayName: 'Azure Resource Manager'
-      description: 'Azure Resource Manager exposes the APIs to manage all of your Azure resources.'
-      id: '/subscriptions/${subscription().subscriptionId}/providers/Microsoft.Web/locations/uksouth/managedApis/arm'
-      type: 'Microsoft.Web/locations/managedApis'
+      id: '/subscriptions/${subscription().subscriptionId}/providers/Microsoft.Web/locations/${location}/managedApis/arm'
     }
-    location: location
+    parameterValueType: 'Alternative'
   }
 }
 
-module apiConnection2 'br/public:avm/res/web/connection:0.4.2' = {
-  name: 'apiConnectionDeployment2'
-  params: {
+resource apiConnection2 'Microsoft.Web/connections@2016-06-01' = {
+  name:  'azurevm-${project}-${environment}-${locationShort}-001'
+  kind:  'V1'
+  location: location
+  properties: {
     displayName: 'azurevm'
-    name: 'azurevm-${project}-${environment}-${locationShort}-001'
     api: {
-      name: 'azurevm'
-      displayName: 'Azure VM'
-      description: 'Azure VM connector allows you to manage virtual machines.'
-      id: '/subscriptions/${subscription().subscriptionId}/providers/Microsoft.Web/locations/uksouth/managedApis/azurevm'
-      type: 'Microsoft.Web/locations/managedApis'
+      id: '/subscriptions/${subscription().subscriptionId}/providers/Microsoft.Web/locations/${location}/managedApis/azurevm'
     }
-    location: location
+    parameterValueType: 'Alternative'
   }
 }

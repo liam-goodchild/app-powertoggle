@@ -1,0 +1,155 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "triggers": {
+    "Recurrence": {
+      "recurrence": {
+        "interval": 5,
+        "frequency": "Minute",
+        "timeZone": "GMT Standard Time"
+      },
+      "evaluatedRecurrence": {
+        "interval": 5,
+        "frequency": "Minute",
+        "timeZone": "GMT Standard Time"
+      },
+      "type": "Recurrence"
+    }
+  },
+  "actions": {
+    "For_each": {
+      "foreach": "@body('List_subscriptions').value\n",
+      "actions": {
+        "List_resources_by_subscription": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azurerm-startstop-prod-uks-001']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/subscriptions/@{encodeURIComponent(items('For_each')?['subscriptionId'])}/resources",
+            "queries": {
+              "x-ms-api-version": "2016-06-01",
+              "$filter": "resourcetype eq 'Microsoft.Compute/virtualMachines'",
+              "$expand": "instanceView"
+            }
+          }
+        },
+        "For_each_1": {
+          "foreach": "@body('List_resources_by_subscription').value\n",
+          "actions": {
+            "Compose": {
+              "type": "Compose",
+              "inputs": "@formatDateTime(convertTimeZone(utcNow(),'UTC','GMT Standard Time'),'HH:mm')"
+            },
+            "Start": {
+              "actions": {
+                "Start_virtual_machine": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azurevm-startstop-prod-uks-001']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/subscriptions/@{encodeURIComponent(split(item()?['id'],'/')[2])}/resourcegroups/@{encodeURIComponent(split(item()?['id'],'/')[4])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(item()?['name'])}/start",
+                    "queries": {
+                      "api-version": "2019-12-01"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Compose": ["Succeeded"]
+              },
+              "else": {
+                "actions": {}
+              },
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@outputs('Compose')",
+                      "@item()?['tags']?['AutoStart']"
+                    ]
+                  }
+                ]
+              },
+              "type": "If"
+            },
+            "Stop": {
+              "actions": {
+                "Deallocate_virtual_machine": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azurevm-startstop-prod-uks-001']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/subscriptions/@{encodeURIComponent(split(item()?['id'],'/')[2])}/resourcegroups/@{encodeURIComponent(split(item()?['id'],'/')[4])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(item()?['name'])}/deallocate",
+                    "queries": {
+                      "api-version": "2019-12-01"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Compose": ["Succeeded"]
+              },
+              "else": {
+                "actions": {}
+              },
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@outputs('Compose')",
+                      "@item()?['tags']?['AutoStop']"
+                    ]
+                  }
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "List_resources_by_subscription": ["Succeeded"]
+          },
+          "type": "Foreach"
+        }
+      },
+      "runAfter": {
+        "List_subscriptions": ["Succeeded"]
+      },
+      "type": "Foreach"
+    },
+    "List_subscriptions": {
+      "runAfter": {},
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azurerm-startstop-prod-uks-001']['connectionId']"
+          }
+        },
+        "method": "get",
+        "path": "/subscriptions",
+        "queries": {
+          "x-ms-api-version": "2016-06-01"
+        }
+      }
+    }
+  },
+  "outputs": {},
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    }
+  }
+}
