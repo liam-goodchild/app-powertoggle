@@ -6,12 +6,14 @@
       "recurrence": {
         "interval": 5,
         "frequency": "Minute",
-        "timeZone": "GMT Standard Time"
+        "timeZone": "GMT Standard Time",
+        "startTime": "17:30"
       },
       "evaluatedRecurrence": {
         "interval": 5,
         "frequency": "Minute",
-        "timeZone": "GMT Standard Time"
+        "timeZone": "GMT Standard Time",
+        "startTime": "17:30"
       },
       "type": "Recurrence"
     }

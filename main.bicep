@@ -1,11 +1,10 @@
 param project string
 param environment string
 param location string = resourceGroup().location
-
+var locationShort = locationShortCodes[location]
 var locationShortCodes = {
   uksouth: 'uks'
 }
-var locationShort = locationShortCodes[location]
 
 resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
   name: 'logic-${project}-${environment}-${locationShort}-001'
