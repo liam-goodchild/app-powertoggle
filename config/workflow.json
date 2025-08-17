@@ -27,7 +27,7 @@
           "inputs": {
             "host": {
               "connection": {
-                "name": "@parameters('$connections')['azurerm-startstop-prod-uks-001']['connectionId']"
+                "name": "@parameters('$connections')['azurerm']['connectionId']"
               }
             },
             "method": "get",
@@ -46,6 +46,15 @@
               "type": "Compose",
               "inputs": "@formatDateTime(convertTimeZone(utcNow(),'UTC','GMT Standard Time'),'HH:mm')"
             },
+            "Compose_Weekday": {
+              "type": "Compose",
+              "inputs": "@dayOfWeek(convertTimeZone(utcNow(),'UTC','GMT Standard Time'))",
+              "runAfter": {
+                "Compose": [
+                  "Succeeded"
+                ]
+              }
+            },
             "Start": {
               "actions": {
                 "Start_virtual_machine": {
@@ -53,7 +62,7 @@
                   "inputs": {
                     "host": {
                       "connection": {
-                        "name": "@parameters('$connections')['azurevm-startstop-prod-uks-001']['connectionId']"
+                        "name": "@parameters('$connections')['azurevm']['connectionId']"
                       }
                     },
                     "method": "post",
@@ -65,7 +74,12 @@
                 }
               },
               "runAfter": {
-                "Compose": ["Succeeded"]
+                "Compose": [
+                  "Succeeded"
+                ],
+                "Compose_Weekday": [
+                  "Succeeded"
+                ]
               },
               "else": {
                 "actions": {}
@@ -76,6 +90,18 @@
                     "equals": [
                       "@outputs('Compose')",
                       "@item()?['tags']?['AutoStart']"
+                    ]
+                  },
+                  {
+                    "greaterOrEquals": [
+                      "@outputs('Compose_Weekday')",
+                      1
+                    ]
+                  },
+                  {
+                    "lessOrEquals": [
+                      "@outputs('Compose_Weekday')",
+                      5
                     ]
                   }
                 ]
@@ -89,7 +115,7 @@
                   "inputs": {
                     "host": {
                       "connection": {
-                        "name": "@parameters('$connections')['azurevm-startstop-prod-uks-001']['connectionId']"
+                        "name": "@parameters('$connections')['azurevm']['connectionId']"
                       }
                     },
                     "method": "post",
@@ -101,7 +127,9 @@
                 }
               },
               "runAfter": {
-                "Compose": ["Succeeded"]
+                "Compose": [
+                  "Succeeded"
+                ]
               },
               "else": {
                 "actions": {}
@@ -120,13 +148,17 @@
             }
           },
           "runAfter": {
-            "List_resources_by_subscription": ["Succeeded"]
+            "List_resources_by_subscription": [
+              "Succeeded"
+            ]
           },
           "type": "Foreach"
         }
       },
       "runAfter": {
-        "List_subscriptions": ["Succeeded"]
+        "List_subscriptions": [
+          "Succeeded"
+        ]
       },
       "type": "Foreach"
     },
@@ -136,7 +168,7 @@
       "inputs": {
         "host": {
           "connection": {
-            "name": "@parameters('$connections')['azurerm-startstop-prod-uks-001']['connectionId']"
+            "name": "@parameters('$connections')['azurerm']['connectionId']"
           }
         },
         "method": "get",

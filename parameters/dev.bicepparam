@@ -1,4 +1,4 @@
 using '../main.bicep'
 
 param project = 'powertoggle'
-param environment = 'prod'
+param environment = 'dev'
