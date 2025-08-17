@@ -34,7 +34,6 @@ jobs:
         run: |
           az deployment group what-if \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --template-file main.bicep \
             --parameters @"${{ vars.PARAMETERS_FILE }}" \
             --name "whatif-${{ github.run_id }}"
 
@@ -42,7 +41,6 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --template-file main.bicep \
             --parameters @"${{ vars.PARAMETERS_FILE }}" \
             --name "deploy-${{ github.run_id }}"
 
@@ -65,7 +63,6 @@ jobs:
         run: |
           az deployment group what-if \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --template-file main.bicep \
             --parameters @"${{ vars.PARAMETERS_FILE }}" \
             --name "whatif-${{ github.run_id }}"
 
@@ -73,6 +70,5 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --template-file main.bicep \
             --parameters @"${{ vars.PARAMETERS_FILE }}" \
             --name "deploy-${{ github.run_id }}"
