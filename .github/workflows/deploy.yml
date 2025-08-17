@@ -34,14 +34,16 @@ jobs:
         run: |
           az deployment group what-if \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --parameters @parameters/dev.bicepparam \
+            --template-file main.bicep \
+            --parameters "${{ vars.PARAMETERS_FILE }}" \
             --name "whatif-${{ github.run_id }}"
 
       - name: Deploy (Dev)
         run: |
           az deployment group create \
             --resource-group "${{ vars.RESOURCE_GROUP }}" \
-            --parameters @parameters/dev.bicepparam \
+            --template-file main.bicep \
+            --parameters "${{ vars.PARAMETERS_FILE }}" \
             --name "deploy-${{ github.run_id }}"
 
   deploy-prod:
@@ -50,15 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - name: Show Azure CLI version
-        run: az version
-
-      - name: Upgrade Azure CLI (supports .bicepparam)
-        run: az upgrade --yes
-
-      - name: Upgrade Bicep
-        run: az bicep upgrade
-
       - uses: actions/checkout@v4
 
       - name: Azure login (OIDC)
