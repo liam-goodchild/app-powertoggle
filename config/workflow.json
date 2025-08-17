@@ -27,7 +27,7 @@
           "inputs": {
             "host": {
               "connection": {
-                "name": "@parameters('$connections')['azurerm-powertoggle-prod-uks-001']['connectionId']"
+                "name": "@parameters('$connections')['azurerm']['connectionId']"
               }
             },
             "method": "get",
@@ -62,7 +62,7 @@
                   "inputs": {
                     "host": {
                       "connection": {
-                        "name": "@parameters('$connections')['azurevm-powertoggle-prod-uks-001']['connectionId']"
+                        "name": "@parameters('$connections')['azurevm']['connectionId']"
                       }
                     },
                     "method": "post",
@@ -115,7 +115,7 @@
                   "inputs": {
                     "host": {
                       "connection": {
-                        "name": "@parameters('$connections')['azurevm-powertoggle-prod-uks-001']['connectionId']"
+                        "name": "@parameters('$connections')['azurevm']['connectionId']"
                       }
                     },
                     "method": "post",
@@ -168,7 +168,7 @@
       "inputs": {
         "host": {
           "connection": {
-            "name": "@parameters('$connections')['azurerm-powertoggle-prod-uks-001']['connectionId']"
+            "name": "@parameters('$connections')['azurerm']['connectionId']"
           }
         },
         "method": "get",
