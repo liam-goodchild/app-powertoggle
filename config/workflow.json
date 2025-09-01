@@ -5,15 +5,15 @@
     "Recurrence": {
       "recurrence": {
         "frequency": "Minute",
-        "interval": 1,
+        "interval": 5,
         "timeZone": "GMT Standard Time",
-        "startTime": "02:00"
+        "startTime": "01:00"
       },
       "evaluatedRecurrence": {
         "frequency": "Minute",
-        "interval": 1,
+        "interval": 5,
         "timeZone": "GMT Standard Time",
-        "startTime": "02:00"
+        "startTime": "01:00"
       },
       "type": "Recurrence"
     }
