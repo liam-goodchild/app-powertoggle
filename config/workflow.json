@@ -4,106 +4,158 @@
   "triggers": {
     "Recurrence": {
       "recurrence": {
-        "interval": 5,
         "frequency": "Minute",
+        "interval": 1,
         "timeZone": "GMT Standard Time",
-        "startTime": "17:30"
+        "startTime": "02:00"
       },
       "evaluatedRecurrence": {
-        "interval": 5,
         "frequency": "Minute",
+        "interval": 1,
         "timeZone": "GMT Standard Time",
-        "startTime": "17:30"
+        "startTime": "02:00"
       },
       "type": "Recurrence"
     }
   },
   "actions": {
-    "List_subscriptions": {
+    "Azure Resource Graph Query": {
       "runAfter": {},
-      "type": "ApiConnection",
+      "type": "Http",
       "inputs": {
-        "host": { "connection": { "name": "@parameters('$connections')['azurerm']['connectionId']" } },
-        "method": "get",
-        "path": "/subscriptions",
-        "queries": { "x-ms-api-version": "2016-06-01" }
-      }
-    },
-    "Select_SubscriptionIds": {
-      "type": "Select",
-      "runAfter": { "List_subscriptions": [ "Succeeded" ] },
-      "inputs": {
-        "from": "@body('List_subscriptions')?['value']",
-        "select": { "subscriptionId": "@item()?['subscriptionId']" }
-      }
-    },
-
-    "ARG_-_StartNow": {
-      "type": "ApiConnection",
-      "runAfter": { "Select_SubscriptionIds": [ "Succeeded" ] },
-      "inputs": {
-        "host": { "connection": { "name": "@parameters('$connections')['azurerm']['connectionId']" } },
-        "method": "post",
-        "path": "/providers/Microsoft.ResourceGraph/resources",
-        "queries": { "x-ms-api-version": "2022-10-01" },
+        "uri": "https://management.azure.com/providers/Microsoft.ResourceGraph/resources",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "queries": {
+          "api-version": "2021-03-01"
+        },
         "body": {
-          "subscriptions": "@{body('Select_SubscriptionIds')}",
-          "query": "let tz = 'GMT Standard Time'; let nowLocal = datetime_utc_to_local(now(), tz); let nowTime = format_datetime(nowLocal, 'HH:mm'); let monthStart = startofmonth(nowLocal); let dowIndex = (s:string) { case(s=='SUN',0,s=='MON',1,s=='TUE',2,s=='WED',3,s=='THU',4,s=='FRI',5,s=='SAT',6,-1) }; let firstDowIdx = dowIndex(format_datetime(monthStart, 'ddd')); let todayDowShort = format_datetime(nowLocal, 'ddd'); let isWeekday = todayDowShort in~ ('Mon','Tue','Wed','Thu','Fri'); Resources | where type =~ 'microsoft.compute/virtualmachines' | extend AutoStart = tostring(tags['AutoStart']), WeekdaysOnly = tolower(tostring(tags['WeekdaysOnly'])) == 'true', PatchOn = tostring(tags['PatchOn']) | extend pN = toint(extract('^(\\\\d)TH', 1, PatchOn)), pD = extract('^\\\\dTH([A-Z]{3})', 1, PatchOn), pT = extract('@(\\\\d{2}:\\\\d{2})$', 1, PatchOn), tgtDowIdx = dowIndex(pD), offsetToFirst = ((tgtDowIdx - firstDowIdx + 7) % 7), targetDate = iif(isnotempty(PatchOn), monthStart + totimespan((offsetToFirst + 7*(pN-1)) * 1d), datetime(null)) | extend isPatchNow = isnotempty(PatchOn) and pT == nowTime and startofday(nowLocal) == startofday(targetDate) | where (AutoStart == nowTime and (not(WeekdaysOnly) or isWeekday)) or isPatchNow | project id, name, resourceGroup, subscriptionId",
-          "options": { "resultFormat": "objectArray", "$top": 2000 }
-        }
-      }
-    },
-
-    "For_each_Start": {
-      "type": "Foreach",
-      "runAfter": { "ARG_-_StartNow": [ "Succeeded", "Failed", "Skipped" ] },
-      "foreach": "@body('ARG_-_StartNow')?['data']",
-      "runtimeConfiguration": { "concurrency": { "repetitions": 8 } },
-      "actions": {
-        "Start_virtual_machine": {
-          "type": "ApiConnection",
-          "inputs": {
-            "host": { "connection": { "name": "@parameters('$connections')['azurevm']['connectionId']" } },
-            "method": "post",
-            "path": "/subscriptions/@{encodeURIComponent(split(items('For_each_Start')?['id'],'/')[2])}/resourcegroups/@{encodeURIComponent(split(items('For_each_Start')?['id'],'/')[4])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(split(items('For_each_Start')?['id'],'/')[8])}/start",
-            "queries": { "api-version": "2019-12-01" }
+          "query": "Resources | where type =~ 'microsoft.compute/virtualmachines' | where isnotempty(tags['AutoStart']) or isnotempty(tags['AutoStop']) | project name, resourceGroup, subscriptionId, tags",
+          "options": {
+            "resultFormat": "objectArray"
           }
+        },
+        "authentication": {
+          "type": "ManagedServiceIdentity"
         }
       }
     },
-
-    "ARG_-_StopNow": {
-      "type": "ApiConnection",
-      "runAfter": { "For_each_Start": [ "Succeeded", "Failed", "Skipped" ] },
-      "inputs": {
-        "host": { "connection": { "name": "@parameters('$connections')['azurerm']['connectionId']" } },
-        "method": "post",
-        "path": "/providers/Microsoft.ResourceGraph/resources",
-        "queries": { "x-ms-api-version": "2022-10-01" },
-        "body": {
-          "subscriptions": "@{body('Select_SubscriptionIds')}",
-          "query": "let tz = 'GMT Standard Time'; let nowLocal = datetime_utc_to_local(now(), tz); let nowTime = format_datetime(nowLocal, 'HH:mm'); let monthStart = startofmonth(nowLocal); let dowIndex = (s:string) { case(s=='SUN',0,s=='MON',1,s=='TUE',2,s=='WED',3,s=='THU',4,s=='FRI',5,s=='SAT',6,-1) }; let firstDowIdx = dowIndex(format_datetime(monthStart, 'ddd')); Resources | where type =~ 'microsoft.compute/virtualmachines' | extend AutoStop = tostring(tags['AutoStop']), PatchOff = tostring(tags['PatchOff']) | extend pN = toint(extract('^(\\\\d)TH', 1, PatchOff)), pD = extract('^\\\\dTH([A-Z]{3})', 1, PatchOff), pT = extract('@(\\\\d{2}:\\\\d{2})$', 1, PatchOff), tgtDowIdx = dowIndex(pD), offsetToFirst = ((tgtDowIdx - firstDowIdx + 7) % 7), targetDate = iif(isnotempty(PatchOff), monthStart + totimespan((offsetToFirst + 7*(pN-1)) * 1d), datetime(null)) | extend isPatchNow = isnotempty(PatchOff) and pT == nowTime and startofday(nowLocal) == startofday(targetDate) | where AutoStop == nowTime or isPatchNow | project id, name, resourceGroup, subscriptionId",
-          "options": { "resultFormat": "objectArray", "$top": 2000 }
-        }
-      }
-    },
-
-    "For_each_Stop": {
-      "type": "Foreach",
-      "runAfter": { "ARG_-_StopNow": [ "Succeeded", "Failed", "Skipped" ] },
-      "foreach": "@body('ARG_-_StopNow')?['data']",
-      "runtimeConfiguration": { "concurrency": { "repetitions": 8 } },
+    "For Tagged VMs": {
+      "foreach": "@body('Azure Resource Graph Query')?['data']",
       "actions": {
-        "Deallocate_virtual_machine": {
-          "type": "ApiConnection",
-          "inputs": {
-            "host": { "connection": { "name": "@parameters('$connections')['azurevm']['connectionId']" } },
-            "method": "post",
-            "path": "/subscriptions/@{encodeURIComponent(split(items('For_each_Stop')?['id'],'/')[2])}/resourcegroups/@{encodeURIComponent(split(items('For_each_Stop')?['id'],'/')[4])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(split(items('For_each_Stop')?['id'],'/')[8])}/deallocate",
-            "queries": { "api-version": "2019-12-01" }
-          }
+        "Compose Time": {
+          "type": "Compose",
+          "inputs": "@formatDateTime(convertTimeZone(utcNow(),'UTC','GMT Standard Time'),'HH:mm')"
+        },
+        "Compose Weekday": {
+          "runAfter": {
+            "Compose Time": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@dayOfWeek(convertTimeZone(utcNow(),'UTC','GMT Standard Time'))"
+        },
+        "Start VM": {
+          "actions": {
+            "Start_virtual_machine": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azurevm']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/subscriptions/@{encodeURIComponent(items('For Tagged VMs')?['subscriptionId'])}/resourcegroups/@{encodeURIComponent(items('For Tagged VMs')?['resourceGroup'])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(items('For Tagged VMs')?['name'])}/start",
+                "queries": {
+                  "api-version": "2019-12-01"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Compose Time": [
+              "Succeeded"
+            ],
+            "Compose Weekday": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {}
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Compose Time')",
+                  "@items('For Tagged VMs')?['tags']?['AutoStart']"
+                ]
+              },
+              {
+                "greaterOrEquals": [
+                  "@outputs('Compose Weekday')",
+                  1
+                ]
+              },
+              {
+                "lessOrEquals": [
+                  "@outputs('Compose Weekday')",
+                  5
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        },
+        "Stop VM": {
+          "actions": {
+            "Deallocate_virtual_machine": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azurevm']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/subscriptions/@{encodeURIComponent(items('For Tagged VMs')?['subscriptionId'])}/resourcegroups/@{encodeURIComponent(items('For Tagged VMs')?['resourceGroup'])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(items('For Tagged VMs')?['name'])}/deallocate",
+                "queries": {
+                  "api-version": "2019-12-01"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Compose Time": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {}
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Compose Time')",
+                  "@items('For Tagged VMs')?['tags']?['AutoStop']"
+                ]
+              }
+            ]
+          },
+          "type": "If"
         }
-      }
+      },
+      "runAfter": {
+        "Azure Resource Graph Query": [
+          "Succeeded"
+        ]
+      },
+      "type": "Foreach"
     }
   },
   "outputs": {},
