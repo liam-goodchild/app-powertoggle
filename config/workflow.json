@@ -32,7 +32,7 @@
           "api-version": "2021-03-01"
         },
         "body": {
-          "query": "Resources | where type =~ 'microsoft.compute/virtualmachines' | where isnotempty(tags['AutoStart']) or isnotempty(tags['AutoStop']) | project name, resourceGroup, subscriptionId, tags",
+          "query": "Resources | where type =~ 'microsoft.compute/virtualmachines' | where isnotempty(tags['AutoStart']) or isnotempty(tags['AutoStop']) or isnotempty(tags['PatchOn']) or isnotempty(tags['PatchOff']) | project name, resourceGroup, subscriptionId, tags",
           "options": {
             "resultFormat": "objectArray"
           }
@@ -58,6 +58,235 @@
           "type": "Compose",
           "inputs": "@dayOfWeek(convertTimeZone(utcNow(),'UTC','GMT Standard Time'))"
         },
+
+        "Compose Local Now": {
+          "type": "Compose",
+          "inputs": "@convertTimeZone(utcNow(),'UTC','GMT Standard Time')",
+          "runAfter": {
+            "Compose Weekday": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose Local Date": {
+          "type": "Compose",
+          "inputs": "@formatDateTime(outputs('Compose Local Now'),'yyyy-MM-dd')",
+          "runAfter": {
+            "Compose Local Now": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose Local Time HHmm": {
+          "type": "Compose",
+          "inputs": "@formatDateTime(outputs('Compose Local Now'),'HHmm')",
+          "runAfter": {
+            "Compose Local Date": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose Month Start": {
+          "type": "Compose",
+          "inputs": "@startOfMonth(outputs('Compose Local Now'))",
+          "runAfter": {
+            "Compose Local Time HHmm": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose MonthStart DOW": {
+          "type": "Compose",
+          "inputs": "@dayOfWeek(outputs('Compose Month Start'))",
+          "runAfter": {
+            "Compose Month Start": [
+              "Succeeded"
+            ]
+          }
+        },
+
+        "Compose PatchOn Raw": {
+          "type": "Compose",
+          "inputs": "@items('For Tagged VMs')?['tags']?['PatchOn']",
+          "runAfter": {
+            "Compose MonthStart DOW": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn OrdinalStr": {
+          "type": "Compose",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),0,3))",
+          "runAfter": {
+            "Compose PatchOn Raw": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn OrdinalNum": {
+          "type": "Compose",
+          "inputs": "@if(equals(outputs('Compose PatchOn OrdinalStr'),'1ST'),1, if(equals(outputs('Compose PatchOn OrdinalStr'),'2ND'),2, if(equals(outputs('Compose PatchOn OrdinalStr'),'3RD'),3, if(equals(outputs('Compose PatchOn OrdinalStr'),'4TH'),4, if(equals(outputs('Compose PatchOn OrdinalStr'),'5TH'),5, 0)))))",
+          "runAfter": {
+            "Compose PatchOn OrdinalStr": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn DayStr": {
+          "type": "Compose",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),3,3))",
+          "runAfter": {
+            "Compose PatchOn OrdinalNum": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn DayNum": {
+          "type": "Compose",
+          "inputs": "@if(equals(outputs('Compose PatchOn DayStr'),'SUN'),0, if(equals(outputs('Compose PatchOn DayStr'),'MON'),1, if(equals(outputs('Compose PatchOn DayStr'),'TUE'),2, if(equals(outputs('Compose PatchOn DayStr'),'WED'),3, if(equals(outputs('Compose PatchOn DayStr'),'THU'),4, if(equals(outputs('Compose PatchOn DayStr'),'FRI'),5, if(equals(outputs('Compose PatchOn DayStr'),'SAT'),6, -1)))))))",
+          "runAfter": {
+            "Compose PatchOn DayStr": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn Time HHmm": {
+          "type": "Compose",
+          "inputs": "@substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),6,4)",
+          "runAfter": {
+            "Compose PatchOn DayNum": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn FirstOffset": {
+          "type": "Compose",
+          "inputs": "@mod(add(sub(outputs('Compose PatchOn DayNum'), outputs('Compose MonthStart DOW')), 7), 7)",
+          "runAfter": {
+            "Compose PatchOn Time HHmm": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn FirstDate": {
+          "type": "Compose",
+          "inputs": "@addDays(outputs('Compose Month Start'), outputs('Compose PatchOn FirstOffset'))",
+          "runAfter": {
+            "Compose PatchOn FirstOffset": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn TargetDate": {
+          "type": "Compose",
+          "inputs": "@addDays(outputs('Compose PatchOn FirstDate'), mul(sub(outputs('Compose PatchOn OrdinalNum'),1), 7))",
+          "runAfter": {
+            "Compose PatchOn FirstDate": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOn TargetDate yyyy-MM-dd": {
+          "type": "Compose",
+          "inputs": "@formatDateTime(outputs('Compose PatchOn TargetDate'),'yyyy-MM-dd')",
+          "runAfter": {
+            "Compose PatchOn TargetDate": [
+              "Succeeded"
+            ]
+          }
+        },
+
+        "Compose PatchOff Raw": {
+          "type": "Compose",
+          "inputs": "@items('For Tagged VMs')?['tags']?['PatchOff']",
+          "runAfter": {
+            "Compose PatchOn TargetDate yyyy-MM-dd": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff OrdinalStr": {
+          "type": "Compose",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),0,3))",
+          "runAfter": {
+            "Compose PatchOff Raw": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff OrdinalNum": {
+          "type": "Compose",
+          "inputs": "@if(equals(outputs('Compose PatchOff OrdinalStr'),'1ST'),1, if(equals(outputs('Compose PatchOff OrdinalStr'),'2ND'),2, if(equals(outputs('Compose PatchOff OrdinalStr'),'3RD'),3, if(equals(outputs('Compose PatchOff OrdinalStr'),'4TH'),4, if(equals(outputs('Compose PatchOff OrdinalStr'),'5TH'),5, 0)))))",
+          "runAfter": {
+            "Compose PatchOff OrdinalStr": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff DayStr": {
+          "type": "Compose",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),3,3))",
+          "runAfter": {
+            "Compose PatchOff OrdinalNum": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff DayNum": {
+          "type": "Compose",
+          "inputs": "@if(equals(outputs('Compose PatchOff DayStr'),'SUN'),0, if(equals(outputs('Compose PatchOff DayStr'),'MON'),1, if(equals(outputs('Compose PatchOff DayStr'),'TUE'),2, if(equals(outputs('Compose PatchOff DayStr'),'WED'),3, if(equals(outputs('Compose PatchOff DayStr'),'THU'),4, if(equals(outputs('Compose PatchOff DayStr'),'FRI'),5, if(equals(outputs('Compose PatchOff DayStr'),'SAT'),6, -1)))))))",
+          "runAfter": {
+            "Compose PatchOff DayStr": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff Time HHmm": {
+          "type": "Compose",
+          "inputs": "@substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),6,4)",
+          "runAfter": {
+            "Compose PatchOff DayNum": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff FirstOffset": {
+          "type": "Compose",
+          "inputs": "@mod(add(sub(outputs('Compose PatchOff DayNum'), outputs('Compose MonthStart DOW')), 7), 7)",
+          "runAfter": {
+            "Compose PatchOff Time HHmm": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff FirstDate": {
+          "type": "Compose",
+          "inputs": "@addDays(outputs('Compose Month Start'), outputs('Compose PatchOff FirstOffset'))",
+          "runAfter": {
+            "Compose PatchOff FirstOffset": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff TargetDate": {
+          "type": "Compose",
+          "inputs": "@addDays(outputs('Compose PatchOff FirstDate'), mul(sub(outputs('Compose PatchOff OrdinalNum'),1), 7))",
+          "runAfter": {
+            "Compose PatchOff FirstDate": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose PatchOff TargetDate yyyy-MM-dd": {
+          "type": "Compose",
+          "inputs": "@formatDateTime(outputs('Compose PatchOff TargetDate'),'yyyy-MM-dd')",
+          "runAfter": {
+            "Compose PatchOff TargetDate": [
+              "Succeeded"
+            ]
+          }
+        },
+
         "Start VM": {
           "actions": {
             "Start_virtual_machine": {
@@ -111,6 +340,7 @@
           },
           "type": "If"
         },
+
         "Stop VM": {
           "actions": {
             "Deallocate_virtual_machine": {
@@ -148,7 +378,99 @@
             ]
           },
           "type": "If"
+        },
+
+        "Start VM (PatchOn)": {
+          "type": "If",
+          "runAfter": {
+            "Compose PatchOff TargetDate yyyy-MM-dd": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Compose Local Date')",
+                  "@outputs('Compose PatchOn TargetDate yyyy-MM-dd')"
+                ]
+              },
+              {
+                "equals": [
+                  "@outputs('Compose Local Time HHmm')",
+                  "@outputs('Compose PatchOn Time HHmm')"
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Start_virtual_machine_PatchOn": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azurevm']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/subscriptions/@{encodeURIComponent(items('For Tagged VMs')?['subscriptionId'])}/resourcegroups/@{encodeURIComponent(items('For Tagged VMs')?['resourceGroup'])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(items('For Tagged VMs')?['name'])}/start",
+                "queries": {
+                  "api-version": "2019-12-01"
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        },
+
+        "Stop VM (PatchOff)": {
+          "type": "If",
+          "runAfter": {
+            "Start VM (PatchOn)": [
+              "Succeeded",
+              "Skipped"
+            ]
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Compose Local Date')",
+                  "@outputs('Compose PatchOff TargetDate yyyy-MM-dd')"
+                ]
+              },
+              {
+                "equals": [
+                  "@outputs('Compose Local Time HHmm')",
+                  "@outputs('Compose PatchOff Time HHmm')"
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Deallocate_virtual_machine_PatchOff": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azurevm']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/subscriptions/@{encodeURIComponent(items('For Tagged VMs')?['subscriptionId'])}/resourcegroups/@{encodeURIComponent(items('For Tagged VMs')?['resourceGroup'])}/providers/Microsoft.Compute/virtualMachines/@{encodeURIComponent(items('For Tagged VMs')?['name'])}/deallocate",
+                "queries": {
+                  "api-version": "2019-12-01"
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
         }
+
       },
       "runAfter": {
         "Azure Resource Graph Query": [
