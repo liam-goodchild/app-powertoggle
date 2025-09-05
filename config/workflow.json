@@ -58,7 +58,6 @@
           "type": "Compose",
           "inputs": "@dayOfWeek(convertTimeZone(utcNow(),'UTC','GMT Standard Time'))"
         },
-
         "Compose Local Now": {
           "type": "Compose",
           "inputs": "@convertTimeZone(utcNow(),'UTC','GMT Standard Time')",
@@ -104,7 +103,6 @@
             ]
           }
         },
-
         "Compose PatchOn Raw": {
           "type": "Compose",
           "inputs": "@items('For Tagged VMs')?['tags']?['PatchOn']",
@@ -116,7 +114,7 @@
         },
         "Compose PatchOn OrdinalStr": {
           "type": "Compose",
-          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),0,3))",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON@00:00'),0,3))",
           "runAfter": {
             "Compose PatchOn Raw": [
               "Succeeded"
@@ -134,7 +132,7 @@
         },
         "Compose PatchOn DayStr": {
           "type": "Compose",
-          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),3,3))",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOn Raw'),'000MON@00:00'),3,3))",
           "runAfter": {
             "Compose PatchOn OrdinalNum": [
               "Succeeded"
@@ -152,7 +150,7 @@
         },
         "Compose PatchOn Time HHmm": {
           "type": "Compose",
-          "inputs": "@substring(coalesce(outputs('Compose PatchOn Raw'),'000MON0000'),6,4)",
+          "inputs": "@replace(last(split(coalesce(outputs('Compose PatchOn Raw'),'000MON@00:00'),'@')),':','')",
           "runAfter": {
             "Compose PatchOn DayNum": [
               "Succeeded"
@@ -195,7 +193,6 @@
             ]
           }
         },
-
         "Compose PatchOff Raw": {
           "type": "Compose",
           "inputs": "@items('For Tagged VMs')?['tags']?['PatchOff']",
@@ -207,7 +204,7 @@
         },
         "Compose PatchOff OrdinalStr": {
           "type": "Compose",
-          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),0,3))",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON@00:00'),0,3))",
           "runAfter": {
             "Compose PatchOff Raw": [
               "Succeeded"
@@ -225,7 +222,7 @@
         },
         "Compose PatchOff DayStr": {
           "type": "Compose",
-          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),3,3))",
+          "inputs": "@toUpper(substring(coalesce(outputs('Compose PatchOff Raw'),'000MON@00:00'),3,3))",
           "runAfter": {
             "Compose PatchOff OrdinalNum": [
               "Succeeded"
@@ -243,7 +240,7 @@
         },
         "Compose PatchOff Time HHmm": {
           "type": "Compose",
-          "inputs": "@substring(coalesce(outputs('Compose PatchOff Raw'),'000MON0000'),6,4)",
+          "inputs": "@replace(last(split(coalesce(outputs('Compose PatchOff Raw'),'000MON@00:00'),'@')),':','')",
           "runAfter": {
             "Compose PatchOff DayNum": [
               "Succeeded"
@@ -286,7 +283,6 @@
             ]
           }
         },
-
         "Start VM": {
           "actions": {
             "Start_virtual_machine": {
@@ -340,7 +336,6 @@
           },
           "type": "If"
         },
-
         "Stop VM": {
           "actions": {
             "Deallocate_virtual_machine": {
@@ -379,7 +374,6 @@
           },
           "type": "If"
         },
-
         "Start VM (PatchOn)": {
           "type": "If",
           "runAfter": {
@@ -424,7 +418,6 @@
             "actions": {}
           }
         },
-
         "Stop VM (PatchOff)": {
           "type": "If",
           "runAfter": {
@@ -470,7 +463,6 @@
             "actions": {}
           }
         }
-
       },
       "runAfter": {
         "Azure Resource Graph Query": [
